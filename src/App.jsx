@@ -79,6 +79,7 @@ export default function TruthAndDareApp() {
           timestamp: serverTimestamp()
         });
       }
+      console.log('Loading complete');
       setLoading(false);
     });
     // Listen to Players
