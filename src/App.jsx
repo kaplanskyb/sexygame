@@ -199,7 +199,6 @@ export default function TruthAndDareApp() {
         updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
       }
     } else if (gameState?.mode === 'dare') {
-      // Compute points
       const currentUid = players[gameState?.currentTurnIndex]?.uid;
       const likeVotes = Object.values(gameState?.votes || {}).filter(v => v === 'like').length;
       const points = gameState?.points || {};
@@ -426,33 +425,6 @@ export default function TruthAndDareApp() {
       );
     }
 
-    if (gameState?.mode === 'admin_setup') {
-      return (
-        <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
-          <h2 className="text-2xl font-bold mb-4">Setup Round</h2>
-          <select 
-            value={selectedType} 
-            onChange={e => setSelectedType(e.target.value)} 
-            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
-          >
-            <option value="">Select Type</option>
-            <option value="truth">Truth</option>
-            <option value="dare">Dare</option>
-            <option value="yn">Y/N</option>
-          </select>
-          <select 
-            value={selectedLevel} 
-            onChange={e => setSelectedLevel(e.target.value)} 
-            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
-          >
-            <option value="">Select Level</option>
-            {uniqueLevels.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-          <button onClick={startRound} disabled={!selectedType || !selectedLevel} className="w-full max-w-md bg-green-600 p-4 rounded-xl font-bold">Start Round</button>
-        </div>
-      );
-    }
-
     const card = currentCard();
     const answers = gameState?.answers || {};
     const allAnswered = Object.keys(answers).length >= players.length;
@@ -509,14 +481,6 @@ export default function TruthAndDareApp() {
         </div>
         <p className="text-center text-slate-400">Waiting for admin to start game...</p>
         {isGameAdmin() && <button onClick={startGame} className="w-full max-w-sm bg-green-600 p-4 rounded-xl font-bold">Start Game</button>}
-      </div>
-    );
-  }
-
-  if (gameState?.mode === 'admin_setup') {
-    return (
-      <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
-        <h2 className="text-2xl font-bold mb-4">Waiting for Admin Setup</h2>
       </div>
     );
   }
