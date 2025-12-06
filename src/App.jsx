@@ -32,6 +32,7 @@ export default function TruthAndDareApp() {
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('');
   const [gender, setGender] = useState('male');
+  const [coupleNumber, setCoupleNumber] = useState('');
   const [code, setCode] = useState('');
   const [gameState, setGameState] = useState(null);
   const [players, setPlayers] = useState([]);
@@ -39,6 +40,7 @@ export default function TruthAndDareApp() {
   const [pairChallenges, setPairChallenges] = useState([]);
   const [uniqueLevels, setUniqueLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const [loading, setLoading] = useState(true);
   const [inputAnswer, setInputAnswer] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -127,7 +129,7 @@ export default function TruthAndDareApp() {
       return;
     }
 
-    if (!gender || !code) return;
+    if (!gender || !code || !coupleNumber) return;
 
     if (code !== gameState?.code) {
       alert('Código incorrecto');
@@ -135,7 +137,7 @@ export default function TruthAndDareApp() {
     }
 
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid), {
-      uid: user.uid, name: userName, gender, joinedAt: serverTimestamp(), isActive: true
+      uid: user.uid, name: userName, gender, coupleNumber, joinedAt: serverTimestamp(), isActive: true
     });
   };
 
@@ -223,24 +225,14 @@ export default function TruthAndDareApp() {
       const lines = csv.split('\n').slice(1); // skip header
       for (const line of lines) {
         if (!line.trim()) continue;
-        if (collectionName === 'pairChallenges') {
-          const [level, male, female, type, answered] = line.split(',');
-          await addDoc(ref, {
-            level: level.trim(),
-            male: male.trim(),
-            female: female.trim(),
-            type: type.trim(),
-            answered: answered.trim() === 'T'
-          });
-        } else {
-          const [level, type, text, answered] = line.split(',');
-          await addDoc(ref, {
-            level: level.trim(),
-            type: type.trim(),
-            text: text.trim(),
-            answered: answered.trim() === 'T'
-          });
-        }
+        const [level, male, female, type, answered] = line.split(',');
+        await addDoc(ref, {
+          level: level.trim(),
+          male: male.trim(),
+          female: female.trim(),
+          type: type.trim(),
+          answered: answered.trim() === 'T'
+        });
       }
     };
     reader.readAsText(file);
@@ -332,6 +324,11 @@ export default function TruthAndDareApp() {
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
+          <input 
+            type="number" placeholder="Número de pareja" 
+            className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
+            value={coupleNumber} onChange={e => setCoupleNumber(e.target.value)}
+          />
           {userName.toLowerCase() !== 'admin' && (
             <input 
               type="text" placeholder="Código del juego" 
