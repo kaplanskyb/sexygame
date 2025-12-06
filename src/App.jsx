@@ -41,6 +41,7 @@ export default function TruthAndDareApp() {
   const [loading, setLoading] = useState(true);
   const [inputAnswer, setInputAnswer] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [uploading, setUploading] = useState(false);
   // 1. Authentication
   useEffect(() => {
     const initAuth = async () => {
@@ -267,30 +268,35 @@ export default function TruthAndDareApp() {
   const handleUploadCsv = async (e, collectionName) => {
     const file = e.target.files[0];
     if (!file) return;
-    // Delete existing in the collection
-    const ref = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-    const snapshot = await getDocs(ref);
-    for (const d of snapshot.docs) {
-      await deleteDoc(d.ref);
-    }
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const csv = event.target.result;
-      const lines = csv.split('\n').slice(1); // skip header
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const [level, male, female, type, answered] = line.split(',');
-        await addDoc(ref, {
-          level: level.trim(),
-          male: male.trim(),
-          female: female.trim(),
-          type: type.trim().toLowerCase(),
-          answered: answered.trim() === 'T'
-        });
+    setUploading(true);
+    try {
+      // Delete existing in the collection
+      const ref = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+      const snapshot = await getDocs(ref);
+      for (const d of snapshot.docs) {
+        await deleteDoc(d.ref);
       }
-      alert('Upload completed');
-    };
-    reader.readAsText(file);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const csv = event.target.result;
+        const lines = csv.split('\n').slice(1); // skip header
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const [level, male, female, type, answered] = line.split(',');
+          await addDoc(ref, {
+            level: level.trim(),
+            male: male.trim(),
+            female: female.trim(),
+            type: type.trim().toLowerCase(),
+            answered: answered.trim() === 'T'
+          });
+        }
+        alert('Upload completed');
+      };
+      reader.readAsText(file);
+    } finally {
+      setUploading(false);
+    }
   };
   const handleUploadPairCsv = (e) => handleUploadCsv(e, 'pairChallenges');
   const handleEndGame = async () => {
@@ -420,11 +426,11 @@ export default function TruthAndDareApp() {
           />
           <button onClick={setGameCode} disabled={!code.trim()} className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4">Set Code</button>
           <label className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4 flex justify-center items-center cursor-pointer">
-            <Upload className="mr-2" /> Upload Truth/Dare CSV
+            <Upload className="mr-2" /> {uploading ? 'Uploading...' : 'Upload Truth/Dare CSV'}
             <input type="file" accept=".csv" onChange={(e) => handleUploadCsv(e, 'challenges')} className="hidden" />
           </label>
           <label className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4 flex justify-center items-center cursor-pointer">
-            <Upload className="mr-2" /> Upload Y/N CSV
+            <Upload className="mr-2" /> {uploading ? 'Uploading...' : 'Upload Y/N CSV'}
             <input type="file" accept=".csv" onChange={handleUploadPairCsv} className="hidden" />
           </label>
           <button onClick={startGame} className="w-full max-w-sm bg-green-600 p-4 rounded-xl font-bold">Start Game</button>
