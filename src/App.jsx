@@ -281,7 +281,7 @@ export default function TruthAndDareApp() {
     return challenges.find(c => c.id === gameState?.currentChallengeId);
   };
   
-  // PROTECCIÓN QUE EVITA LA PANTALLA BLANCA
+  // --- PROTECCIÓN QUE EVITA EL ERROR DE "SEXO" ---
   const getCardText = (c) => {
     if (!c) return 'Loading...'; 
     if (gameState?.mode === 'yn') {
@@ -291,6 +291,7 @@ export default function TruthAndDareApp() {
     }
     return c.text || 'No text found';
   };
+  // ---------------------------------------------------------
 
   const isJoined = players.some(p => p.uid === user?.uid) || isAdmin;
   const isMyTurn = () => gameState && players[gameState?.currentTurnIndex]?.uid === user?.uid;
