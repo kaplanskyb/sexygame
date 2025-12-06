@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import {
-  getFirestore, collection, doc, setDoc, onSnapshot,
+import { 
+  getFirestore, collection, doc, setDoc, onSnapshot, 
   query, serverTimestamp, updateDoc, getDocs, deleteDoc, addDoc, where
 } from 'firebase/firestore';
-import {
-  getAuth, signInAnonymously, onAuthStateChanged
+import { 
+  getAuth, signInAnonymously, onAuthStateChanged 
 } from 'firebase/auth';
-import {
-  Flame, Zap, RefreshCw, Trophy,
+import { 
+  Flame, Zap, RefreshCw, Trophy, 
   CheckCircle2, ArrowRight, Upload, X, Check, ThumbsUp, ThumbsDown
 } from 'lucide-react';
+
 // --- PASTE YOUR CONFIG BELOW ---
 const firebaseConfig = {
   apiKey: "AIzaSyAw5vlbzCXUa1WDR_YFXyzC6mZ-Dt6cms8",
@@ -21,10 +22,12 @@ const firebaseConfig = {
   appId: "1:474661099120:web:d594e499ac94200c3146b5"
 };
 const appId = 'truth-dare-v1';
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
 export default function TruthAndDareApp() {
   const [user, setUser] = useState(null);
   const [userName, setUserName] = useState('');
@@ -41,7 +44,7 @@ export default function TruthAndDareApp() {
   const [loading, setLoading] = useState(true);
   const [inputAnswer, setInputAnswer] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
-  const [uploading, setUploading] = useState(false);
+
   // 1. Authentication
   useEffect(() => {
     const initAuth = async () => {
@@ -52,16 +55,18 @@ export default function TruthAndDareApp() {
       }
     };
     initAuth();
-   
+    
     return onAuthStateChanged(auth, (u) => {
       setUser(u);
       const savedName = localStorage.getItem('td_username');
       if (savedName) setUserName(savedName);
     });
   }, []);
+
   // 2. Synchronization
   useEffect(() => {
     if (!user) return;
+
     // Listen to Game State
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main');
     const unsubGame = onSnapshot(gameRef, (docSnap) => {
@@ -79,9 +84,9 @@ export default function TruthAndDareApp() {
           timestamp: serverTimestamp()
         });
       }
-      console.log('Loading complete');
       setLoading(false);
     });
+
     // Listen to Players
     const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
     const unsubPlayers = onSnapshot(query(playersRef), (snapshot) => {
@@ -89,6 +94,7 @@ export default function TruthAndDareApp() {
       pList.sort((a, b) => (a.joinedAt?.seconds || 0) - (b.joinedAt?.seconds || 0));
       setPlayers(pList);
     });
+
     // Listen to Challenges (Truth/Dare)
     const challengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
     const unsubChallenges = onSnapshot(query(challengesRef), (snapshot) => {
@@ -97,12 +103,14 @@ export default function TruthAndDareApp() {
       const levels = [...new Set(cList.map(c => c.level))];
       setUniqueLevels(levels);
     });
+
     // Listen to PairChallenges (Y/N)
     const pairChallengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
     const unsubPairChallenges = onSnapshot(query(pairChallengesRef), (snapshot) => {
       const pcList = snapshot.docs.map(d => ({id: d.id, ...d.data()}));
       setPairChallenges(pcList);
     });
+
     return () => {
       unsubGame();
       unsubPlayers();
@@ -110,81 +118,55 @@ export default function TruthAndDareApp() {
       unsubPairChallenges();
     };
   }, [user]);
+
   // Actions
   const joinGame = async () => {
     if (!userName.trim() || !user) return;
     localStorage.setItem('td_username', userName);
+
     if (userName.toLowerCase() === 'admin') {
       setIsAdmin(true);
       return;
     }
+
     if (!gender || !code || !coupleNumber) return;
+
     if (code !== gameState?.code) {
       alert('Invalid code');
       return;
     }
+
     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', user.uid), {
       uid: user.uid, name: userName, gender, coupleNumber, joinedAt: serverTimestamp(), isActive: true
     });
   };
+
   const setGameCode = async () => {
     if (!code.trim()) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       code: code
     });
   };
+
   const startGame = async () => {
     if (players.length < 1) return;
-    // Reset answered for challenges and pairChallenges
-    const challengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
-    const cSnapshot = await getDocs(challengesRef);
-    for (const d of cSnapshot.docs) {
-      await updateDoc(d.ref, { answered: false });
-    }
-    const pairChallengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
-    const pcSnapshot = await getDocs(pairChallengesRef);
-    for (const d of pcSnapshot.docs) {
-      await updateDoc(d.ref, { answered: false });
-    }
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       mode: 'admin_setup'
     });
   };
-  const computePairs = () => {
-    const pairs = {};
-    const groups = {};
-    players.forEach(p => {
-      if (!groups[p.coupleNumber]) groups[p.coupleNumber] = [];
-      groups[p.coupleNumber].push(p);
-    });
-    Object.values(groups).forEach(group => {
-      if (group.length === 2) {
-        pairs[group[0].uid] = group[1].uid;
-        pairs[group[1].uid] = group[0].uid;
-      }
-    });
-    return pairs;
-  };
+
   const startRound = async () => {
-    const id = await getNextChallengeId(selectedType === 'yn' ? 'YN' : selectedType.toUpperCase());
-    if (!id) {
-      alert('No more challenges for this level');
-      return;
-    }
-    let updates = {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       mode: selectedType === 'yn' ? 'yn' : selectedType === 'dare' ? 'dare' : 'question',
       currentTurnIndex: 0,
       questionStreak: 0,
       answers: {},
       votes: {},
       adminUid: players[0].uid,
-      currentChallengeId: id
-    };
-    if (selectedType === 'yn') {
-      updates.pairs = computePairs();
-    }
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), updates);
+      currentChallengeId: await getNextChallengeId(selectedType === 'yn' ? 'YN' : selectedType.toUpperCase())
+    });
   };
+
   const submitAnswer = async (val) => {
     if (!user) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
@@ -192,12 +174,14 @@ export default function TruthAndDareApp() {
     });
     setInputAnswer('');
   };
+
   const submitVote = async (vote) => {
     if (!user) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       [`votes.${user.uid}`]: vote
     });
   };
+
   const nextTurn = async () => {
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main');
     let updates = {};
@@ -207,11 +191,12 @@ export default function TruthAndDareApp() {
       const points = gameState?.points || {};
       points[currentUid] = (points[currentUid] || 0) + likeVotes;
       updates.points = points;
+
       const nextTurnIndex = gameState.currentTurnIndex + 1;
       if (nextTurnIndex < players.length) {
-        updates = { ...updates, currentTurnIndex: nextTurnIndex, votes: {}, answers: {} };
+        updates = { currentTurnIndex: nextTurnIndex, votes: {}, answers: {} };
       } else {
-        updates = { ...updates, mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
       }
     } else if (gameState?.mode === 'dare') {
       // Compute points
@@ -220,11 +205,12 @@ export default function TruthAndDareApp() {
       const points = gameState?.points || {};
       points[currentUid] = (points[currentUid] || 0) + likeVotes;
       updates.points = points;
+
       const nextTurnIndex = gameState.currentTurnIndex + 1;
       if (nextTurnIndex < players.length) {
-        updates = { ...updates, currentTurnIndex: nextTurnIndex, votes: {} };
+        updates = { currentTurnIndex: nextTurnIndex, votes: {} };
       } else {
-        updates = { ...updates, mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
       }
     } else if (gameState?.mode === 'yn') {
       // Compute points for pairs
@@ -246,107 +232,84 @@ export default function TruthAndDareApp() {
         }
       });
       updates.points = points;
-      updates = { ...updates, mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
+      updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
     }
     updates.currentChallengeId = await getNextChallengeId(selectedType === 'yn' ? 'YN' : selectedType.toUpperCase());
     await updateDoc(gameRef, updates);
   };
+
   const getNextChallengeId = async (type) => {
     let ref = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
-    let q;
-    if (type === 'YN') {
-      ref = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
-      q = query(ref, where('answered', '==', false), where('level', '==', selectedLevel));
-    } else {
-      q = query(ref, where('answered', '==', false), where('level', '==', selectedLevel), where('type', '==', type.toLowerCase()));
-    }
+    if (type === 'YN') ref = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
+    let q = query(ref, where('answered', '==', false), where('level', '==', selectedLevel));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
     const challenge = snapshot.docs[Math.floor(Math.random() * snapshot.size)];
     await updateDoc(challenge.ref, { answered: true });
     return challenge.id;
   };
+
   const handleUploadCsv = async (e, collectionName) => {
     const file = e.target.files[0];
     if (!file) return;
-    setUploading(true);
-    try {
-      // Delete existing in the collection
-      const ref = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
-      const snapshot = await getDocs(ref);
-      for (const d of snapshot.docs) {
-        await deleteDoc(d.ref);
-      }
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        try {
-          const csv = event.target.result;
-          const lines = csv.split('\n').slice(1); // skip header
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            if (collectionName === 'challenges') {
-              const [level, typeStr, pregunta, sexo, answered] = line.split(',');
-              const typeTrim = typeStr.trim().toUpperCase();
-              const type_val = typeTrim === 'T' ? 'truth' : typeTrim === 'D' ? 'dare' : typeTrim.toLowerCase();
-              const answered_val = answered.trim().toLowerCase() === 'true';
-              const sexoTrim = sexo.trim().toUpperCase();
-              await addDoc(ref, {
-                level: level.trim(),
-                type: type_val,
-                pregunta: pregunta.trim(),
-                sexo: sexoTrim,
-                answered: answered_val
-              });
-            } else if (collectionName === 'pairChallenges') {
-              const [level, male, female, type, answered] = line.split(',');
-              const answered_val = answered.trim().toLowerCase() === 'true';
-              await addDoc(ref, {
-                level: level.trim(),
-                male: male.trim(),
-                female: female.trim(),
-                type: type.trim().toLowerCase(),
-                answered: answered_val
-              });
-            }
-          }
-          alert('Upload completed');
-        } catch (error) {
-          console.error('Error parsing CSV:', error);
-          alert('Error during upload: ' + error.message);
-        }
-      };
-      reader.readAsText(file);
-    } catch (error) {
-      console.error('Error deleting docs:', error);
-      alert('Error during upload: ' + error.message);
-    } finally {
-      setUploading(false);
+
+    // Delete existing in the collection
+    const ref = collection(db, 'artifacts', appId, 'public', 'data', collectionName);
+    const snapshot = await getDocs(ref);
+    for (const d of snapshot.docs) {
+      await deleteDoc(d.ref);
     }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const csv = event.target.result;
+      const lines = csv.split('\n').slice(1); // skip header
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const [level, male, female, type, answered] = line.split(',');
+        await addDoc(ref, {
+          level: level.trim(),
+          male: male.trim(),
+          female: female.trim(),
+          type: type.trim(),
+          answered: answered.trim() === 'T'
+        });
+      }
+      alert('Upload completed');
+    };
+    reader.readAsText(file);
   };
+
   const handleUploadPairCsv = (e) => handleUploadCsv(e, 'pairChallenges');
+
   const handleEndGame = async () => {
     if (!window.confirm('Are you sure? End game and show results.')) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       mode: 'ended'
     });
   };
+
   const handleRestart = async () => {
     if (!window.confirm('Are you sure? Delete all players and restart game.')) return;
+
     const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
     const snapshot = await getDocs(playersRef);
     for (const d of snapshot.docs) {
       await deleteDoc(d.ref);
     }
+
     const challengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
     const cSnapshot = await getDocs(challengesRef);
     for (const d of cSnapshot.docs) {
       await updateDoc(d.ref, { answered: false });
     }
+
     const pairChallengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
     const pcSnapshot = await getDocs(pairChallengesRef);
     for (const d of pcSnapshot.docs) {
       await updateDoc(d.ref, { answered: false });
     }
+
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main');
     await updateDoc(gameRef, {
       mode: 'lobby',
@@ -360,66 +323,57 @@ export default function TruthAndDareApp() {
       adminUid: null
     });
   };
+
   // Helpers
-  const getChallengeText = (card, gender) => {
-    if (card.sexo === 'B') return card.pregunta;
-    if (card.sexo === 'M' && gender === 'male') return card.pregunta;
-    if (card.sexo === 'F' && gender === 'female') return card.pregunta;
-    return 'No challenge for this gender';
-  };
-  const currentPlayer = players.find(p => p.uid === user?.uid);
   const currentPlayerName = () => gameState && players.length > 0 ? players[gameState?.currentTurnIndex]?.name : 'Nobody';
   const currentCard = () => {
     if (!gameState || !gameState?.currentChallengeId) return null;
-    if (gameState.mode === 'yn') {
-      return pairChallenges.find(c => c.id === gameState?.currentChallengeId);
-    }
     return challenges.find(c => c.id === gameState?.currentChallengeId);
   };
   const isJoined = players.some(p => p.uid === user?.uid) || isAdmin;
   const isMyTurn = () => gameState && players[gameState?.currentTurnIndex]?.uid === user?.uid;
   const isGameAdmin = () => gameState?.adminUid === user?.uid;
   const votes = gameState?.votes || {};
-  const answers = gameState?.answers || {};
-  const allAnswered = Object.keys(answers).length >= players.length;
-  const allVoted = Object.keys(votes).length >= (players.length - 1);
+  const allAnswered = Object.keys(gameState?.answers || {}).length >= players.length;
   const showDareText = gameState?.mode === 'dare' ? isMyTurn() : true;
-  const playerAnswered = answers[user?.uid];
-  const playerVoted = votes[user?.uid];
-  const yesCount = Object.values(votes).filter(v => v === 'yes').length;
+  const playerAnswered = gameState?.answers && gameState?.answers[user.uid];
+  const allVoted = Object.keys(gameState?.votes || {}).length >= (players.length - 1);
+  const yesCount = Object.values(gameState?.votes || {}).filter(v => v === 'yes').length;
   const noCount = (players.length - 1) - yesCount;
   const passed = yesCount >= noCount;
   const currentUid = players[gameState?.currentTurnIndex]?.uid;
   const canVote = gameState?.mode === 'dare' && !isMyTurn() && !votes[user.uid] && !isAdmin;
+
   // RENDER
   if (loading) return <div className="h-screen bg-slate-900 text-white flex items-center justify-center">Loading...</div>;
+
   if (!isJoined) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white">
         <div className="w-full max-w-md bg-slate-800 p-8 rounded-2xl border border-purple-500/30 text-center">
           <Flame className="w-16 h-16 text-purple-500 mx-auto mb-6" />
           <h1 className="text-3xl font-bold mb-2">Truth & Dare</h1>
-          <input
-            type="text" placeholder="Your name... (or 'admin')"
+          <input 
+            type="text" placeholder="Your name... (or 'admin')" 
             className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
             value={userName} onChange={e => setUserName(e.target.value)}
           />
-          <select
-            value={gender}
-            onChange={e => setGender(e.target.value)}
+          <select 
+            value={gender} 
+            onChange={e => setGender(e.target.value)} 
             className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
           >
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
-          <input
-            type="number" placeholder="Couple number"
+          <input 
+            type="number" placeholder="Couple number" 
             className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
             value={coupleNumber} onChange={e => setCoupleNumber(e.target.value)}
           />
           {userName.toLowerCase() !== 'admin' && (
-            <input
-              type="text" placeholder="Game code"
+            <input 
+              type="text" placeholder="Game code" 
               className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
               value={code} onChange={e => setCode(e.target.value)}
             />
@@ -429,6 +383,7 @@ export default function TruthAndDareApp() {
       </div>
     );
   }
+
   if (gameState?.mode === 'ended') {
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
@@ -441,6 +396,7 @@ export default function TruthAndDareApp() {
       </div>
     );
   }
+
   if (isAdmin) {
     if (!gameState || gameState?.mode === 'lobby') {
       return (
@@ -450,18 +406,18 @@ export default function TruthAndDareApp() {
           <div className="bg-slate-800 p-4 rounded-xl w-full max-w-sm mb-6">
             {players.map(p => <div key={p.uid} className="py-1">{p.name} ({p.gender[0].toUpperCase()})</div>)}
           </div>
-          <input
-            type="text" placeholder="Game code"
+          <input 
+            type="text" placeholder="Game code" 
             className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
             value={code} onChange={e => setCode(e.target.value)}
           />
           <button onClick={setGameCode} disabled={!code.trim()} className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4">Set Code</button>
           <label className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4 flex justify-center items-center cursor-pointer">
-            <Upload className="mr-2" /> {uploading ? 'Uploading...' : 'Upload Truth/Dare CSV'}
+            <Upload className="mr-2" /> Upload Truth/Dare CSV
             <input type="file" accept=".csv" onChange={(e) => handleUploadCsv(e, 'challenges')} className="hidden" />
           </label>
           <label className="w-full max-w-sm bg-blue-600 p-4 rounded-xl font-bold mb-4 flex justify-center items-center cursor-pointer">
-            <Upload className="mr-2" /> {uploading ? 'Uploading...' : 'Upload Y/N CSV'}
+            <Upload className="mr-2" /> Upload Y/N CSV
             <input type="file" accept=".csv" onChange={handleUploadPairCsv} className="hidden" />
           </label>
           <button onClick={startGame} className="w-full max-w-sm bg-green-600 p-4 rounded-xl font-bold">Start Game</button>
@@ -469,13 +425,14 @@ export default function TruthAndDareApp() {
         </div>
       );
     }
+
     if (gameState?.mode === 'admin_setup') {
       return (
         <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
           <h2 className="text-2xl font-bold mb-4">Setup Round</h2>
-          <select
-            value={selectedType}
-            onChange={e => setSelectedType(e.target.value)}
+          <select 
+            value={selectedType} 
+            onChange={e => setSelectedType(e.target.value)} 
             className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
           >
             <option value="">Select Type</option>
@@ -483,9 +440,9 @@ export default function TruthAndDareApp() {
             <option value="dare">Dare</option>
             <option value="yn">Y/N</option>
           </select>
-          <select
-            value={selectedLevel}
-            onChange={e => setSelectedLevel(e.target.value)}
+          <select 
+            value={selectedLevel} 
+            onChange={e => setSelectedLevel(e.target.value)} 
             className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
           >
             <option value="">Select Level</option>
@@ -495,53 +452,43 @@ export default function TruthAndDareApp() {
         </div>
       );
     }
+
     const card = currentCard();
-    const isQuestionLike = gameState?.mode === 'question' || gameState?.mode === 'yn';
-    const currentGender = players[gameState.currentTurnIndex]?.gender;
+    const answers = gameState?.answers || {};
+    const allAnswered = Object.keys(answers).length >= players.length;
+
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col p-6">
         <div className="flex justify-between items-center mb-6">
-          <div className="flex gap-2 font-bold text-lg"><Zap className="text-yellow-400"/> {gameState?.mode === 'yn' ? 'Y/N' : gameState?.mode.toUpperCase()} (Admin)</div>
+          <div className="flex gap-2 font-bold text-lg"><Zap className="text-yellow-400"/> {gameState?.mode === 'question' ? 'Truth' : 'Dare'} (Admin)</div>
           <div className="text-sm text-slate-400">Turn: {currentPlayerName()}</div>
         </div>
+
         <div className="flex-1 flex flex-col items-center justify-center">
-          <div className={`w-full max-w-md p-8 rounded-2xl border-2 text-center mb-8 ${isQuestionLike ? 'border-indigo-500 bg-indigo-900/20' : 'border-pink-500 bg-pink-900/20'}`}>
-            {isQuestionLike ? <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto mb-4"/> : <Flame className="w-12 h-12 text-pink-400 mx-auto mb-4"/>}
-            {gameState?.mode === 'yn' ? (
-              <>
-                <h3 className="text-2xl font-bold">Male: {card?.male || 'No challenge available'}</h3>
-                <h3 className="text-2xl font-bold">Female: {card?.female || 'No challenge available'}</h3>
-              </>
-            ) : (
-              <h3 className="text-2xl font-bold">For {currentGender}: {getChallengeText(card, currentGender) || 'No challenge available'}</h3>
-            )}
+          <div className={`w-full max-w-md p-8 rounded-2xl border-2 text-center mb-8 ${gameState?.mode === 'question' ? 'border-indigo-500 bg-indigo-900/20' : 'border-pink-500 bg-pink-900/20'}`}>
+            {gameState?.mode === 'question' ? <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto mb-4"/> : <Flame className="w-12 h-12 text-pink-400 mx-auto mb-4"/>}
+            <h3 className="text-2xl font-bold">{card ? card.text : 'Loading...'}</h3>
           </div>
+
           <div className="w-full max-w-md bg-slate-800 p-4 rounded-xl mb-4">
             <h4 className="font-bold mb-2">Answers/Votes:</h4>
             {players.map(p => (
               <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700">
                 <span>{p.name} ({p.gender[0].toUpperCase()})</span>
-                <span className="font-bold">{(gameState?.mode === 'yn' || gameState?.mode === 'question') ? (answers[p.uid] || 'Pending') : (votes[p.uid] || 'Pending')}</span>
+                <span className="font-bold">{gameState?.mode === 'question' ? (answers[p.uid] || 'Pending') : (votes[p.uid] || 'Pending')}</span>
               </div>
             ))}
           </div>
-          <div className="w-full max-w-md bg-slate-800 p-4 rounded-xl mb-4">
-            <h4 className="font-bold mb-2">Points:</h4>
-            {players.map(p => (
-              <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700">
-                <span>{p.name} ({p.gender[0].toUpperCase()})</span>
-                <span className="font-bold">{gameState?.points[p.uid] || 0}</span>
-              </div>
-            ))}
-          </div>
-          <select
-            value={selectedLevel}
-            onChange={e => setSelectedLevel(e.target.value)}
+
+          <select 
+            value={selectedLevel} 
+            onChange={e => setSelectedLevel(e.target.value)} 
             className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
           >
             <option value="">Select Level</option>
             {uniqueLevels.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
+
           <button onClick={nextTurn} disabled={!selectedLevel} className="w-full max-w-md bg-indigo-600 p-3 rounded-lg font-bold">
             Next {allAnswered || allVoted ? '' : '(Force)'}
           </button>
@@ -551,6 +498,7 @@ export default function TruthAndDareApp() {
       </div>
     );
   }
+
   if (gameState && gameState?.mode === 'lobby') {
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
@@ -564,6 +512,7 @@ export default function TruthAndDareApp() {
       </div>
     );
   }
+
   if (gameState?.mode === 'admin_setup') {
     return (
       <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
@@ -571,78 +520,67 @@ export default function TruthAndDareApp() {
       </div>
     );
   }
+
   const card = currentCard();
-  const challengeText = gameState.mode === 'yn' ? card?.[currentPlayer?.gender] : getChallengeText(card, currentPlayer?.gender);
-  const modeTitle = gameState?.mode === 'question' ? 'Truth' : gameState?.mode === 'dare' ? 'Dare' : 'Y/N';
+  const playerVoted = votes[user.uid];
+
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col p-6">
       <div className="flex justify-between items-center mb-6">
-        <div className="flex gap-2 font-bold text-lg"><Zap className="text-yellow-400"/> {currentPlayer?.name} (Couple {currentPlayer?.coupleNumber})</div>
+        <div className="flex gap-2 font-bold text-lg"><Zap className="text-yellow-400"/> {gameState?.mode === 'question' ? 'Truth' : 'Dare'}</div>
         <div className="text-sm text-slate-400">Turn: {currentPlayerName()}</div>
       </div>
+
       <div className="flex-1 flex flex-col items-center justify-center">
-        {gameState.mode !== 'yn' && (showDareText ? (
+        {showDareText ? (
           <div className={`w-full max-w-md p-8 rounded-2xl border-2 text-center mb-8 ${gameState?.mode === 'question' ? 'border-indigo-500 bg-indigo-900/20' : 'border-pink-500 bg-pink-900/20'}`}>
             {gameState?.mode === 'question' ? <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto mb-4"/> : <Flame className="w-12 h-12 text-pink-400 mx-auto mb-4"/>}
-            <h3 className="text-2xl font-bold">{challengeText || 'Loading...'}</h3>
+            <h3 className="text-2xl font-bold">{card ? card.text : 'Loading...'}</h3>
           </div>
         ) : (
           <div className="w-full max-w-md p-8 rounded-2xl border-2 text-center mb-8 border-pink-500 bg-pink-900/20">
             <Flame className="w-12 h-12 text-pink-400 mx-auto mb-4"/>
             <h3 className="text-2xl font-bold">Waiting for {currentPlayerName()} to complete dare...</h3>
           </div>
-        ))}
-        {gameState.mode === 'yn' && (
-          <div className={`w-full max-w-md p-8 rounded-2xl border-2 text-center mb-8 border-indigo-500 bg-indigo-900/20`}>
-            <RefreshCw className="w-12 h-12 text-indigo-400 mx-auto mb-4"/>
-            <h3 className="text-2xl font-bold">{challengeText || 'Loading...'}</h3>
-          </div>
         )}
+
         <div className="w-full max-w-md">
           {gameState?.mode === 'question' && isMyTurn() && !playerAnswered && (
             <button onClick={() => submitAnswer('answered')} className="w-full bg-purple-600 p-4 rounded-xl font-bold">Answered</button>
           )}
+          
           {gameState?.mode === 'question' && playerAnswered && !allVoted && (
             <div className="text-center text-slate-400">Waiting for votes...</div>
           )}
+
           {gameState?.mode === 'question' && !isMyTurn() && !playerVoted && (
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => submitVote('like')} className="bg-green-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsUp className="mr-2" /> Like</button>
               <button onClick={() => submitVote('no like')} className="bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsDown className="mr-2" /> No Like</button>
             </div>
           )}
-          {(gameState?.mode === 'question' || gameState?.mode === 'dare') && allVoted && (
+
+          {gameState?.mode === 'question' && allVoted && (
             <div className="bg-slate-800 p-4 rounded-xl mb-4">
               <h4 className="font-bold mb-2">Results:</h4>
-              {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{votes[p.uid] || 'N/A'}</span></div>)}
+              {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{gameState?.votes[p.uid]}</span></div>)}
               <p className="text-center text-slate-400">Waiting for admin...</p>
             </div>
           )}
+
           {gameState?.mode === 'dare' && !isMyTurn() && !playerVoted && (
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => submitVote('like')} className="bg-green-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsUp className="mr-2" /> Like</button>
               <button onClick={() => submitVote('no like')} className="bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsDown className="mr-2" /> No Like</button>
             </div>
           )}
+
           {gameState?.mode === 'dare' && playerVoted && !allVoted && (
             <div className="text-center text-slate-400">Waiting for votes...</div>
           )}
-          {gameState?.mode === 'dare' && isMyTurn() && !allVoted && (
-            <div className="text-center text-slate-400">Waiting for votes...</div>
-          )}
-          {gameState?.mode === 'yn' && !playerAnswered && (
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => submitAnswer('yes')} className="bg-green-600 p-4 rounded-xl font-bold flex items-center justify-center"><Check className="mr-2" /> Yes</button>
-              <button onClick={() => submitAnswer('no')} className="bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center"><X className="mr-2" /> No</button>
-            </div>
-          )}
-          {gameState?.mode === 'yn' && playerAnswered && !allAnswered && (
-            <div className="text-center text-slate-400">Waiting for others...</div>
-          )}
-          {gameState?.mode === 'yn' && allAnswered && (
-            <div className="bg-slate-800 p-4 rounded-xl mb-4">
-              <h4 className="font-bold mb-2">Answers:</h4>
-              {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{answers[p.uid] || 'Pending'}</span></div>)}
+
+          {gameState?.mode === 'dare' && allVoted && (
+            <div className="text-center mb-4">
               <p className="text-center text-slate-400">Waiting for admin...</p>
             </div>
           )}
