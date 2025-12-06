@@ -285,27 +285,15 @@ export default function TruthAndDareApp() {
             if (!line.trim()) continue;
             if (collectionName === 'challenges') {
               const [level, typeStr, pregunta, sexo, answered] = line.split(',');
-              let male = '';
-              let female = '';
-              const sexoTrim = sexo.trim().toUpperCase();
-              if (sexoTrim === 'M') {
-                male = pregunta.trim();
-              } else if (sexoTrim === 'F') {
-                female = pregunta.trim();
-              } else if (sexoTrim === 'B') {
-                male = pregunta.trim();
-                female = pregunta.trim();
-              } else {
-                continue; // skip invalid
-              }
               const typeTrim = typeStr.trim().toUpperCase();
               const type_val = typeTrim === 'T' ? 'truth' : typeTrim === 'D' ? 'dare' : typeTrim.toLowerCase();
               const answered_val = answered.trim().toLowerCase() === 'true';
+              const sexoTrim = sexo.trim().toUpperCase();
               await addDoc(ref, {
                 level: level.trim(),
-                male,
-                female,
                 type: type_val,
+                pregunta: pregunta.trim(),
+                sexo: sexoTrim,
                 answered: answered_val
               });
             } else if (collectionName === 'pairChallenges') {
@@ -372,6 +360,12 @@ export default function TruthAndDareApp() {
     });
   };
   // Helpers
+  const getChallengeText = (card, gender) => {
+    if (card.sexo === 'B') return card.pregunta;
+    if (card.sexo === 'M' && gender === 'male') return card.pregunta;
+    if (card.sexo === 'F' && gender === 'female') return card.pregunta;
+    return 'No challenge for this gender';
+  };
   const currentPlayer = players.find(p => p.uid === user?.uid);
   const currentPlayerName = () => gameState && players.length > 0 ? players[gameState?.currentTurnIndex]?.name : 'Nobody';
   const currentCard = () => {
@@ -502,6 +496,7 @@ export default function TruthAndDareApp() {
     }
     const card = currentCard();
     const isQuestionLike = gameState?.mode === 'question' || gameState?.mode === 'yn';
+    const currentGender = players[gameState.currentTurnIndex]?.gender;
     return (
       <div className="min-h-screen bg-slate-900 text-white flex flex-col p-6">
         <div className="flex justify-between items-center mb-6">
@@ -517,7 +512,7 @@ export default function TruthAndDareApp() {
                 <h3 className="text-2xl font-bold">Female: {card?.female || 'No challenge available'}</h3>
               </>
             ) : (
-              <h3 className="text-2xl font-bold">{card ? card[players[gameState.currentTurnIndex]?.gender] : 'No challenge available'}</h3>
+              <h3 className="text-2xl font-bold">For {currentGender}: {getChallengeText(card, currentGender) || 'No challenge available'}</h3>
             )}
           </div>
           <div className="w-full max-w-md bg-slate-800 p-4 rounded-xl mb-4">
@@ -576,7 +571,7 @@ export default function TruthAndDareApp() {
     );
   }
   const card = currentCard();
-  const challengeText = gameState.mode === 'yn' ? card?.[currentPlayer?.gender] : card?.[players[gameState.currentTurnIndex]?.gender];
+  const challengeText = gameState.mode === 'yn' ? card?.[currentPlayer?.gender] : getChallengeText(card, currentPlayer?.gender);
   const modeTitle = gameState?.mode === 'question' ? 'Truth' : gameState?.mode === 'dare' ? 'Dare' : 'Y/N';
   return (
     <div className="min-h-screen bg-slate-900 text-white flex flex-col p-6">
