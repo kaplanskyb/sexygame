@@ -427,7 +427,18 @@ export default function TruthAndDareApp() {
             {uniqueLevels.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
 
-          <button onClick={nextTurn} disabled={!selectedLevel} className="w-full max-w-md bg-indigo-600 p-3 rounded-lg font-bold">
+          <select 
+            value={selectedType} 
+            onChange={e => setSelectedType(e.target.value)} 
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
+          >
+            <option value="">Select Type</option>
+            <option value="truth">Truth</option>
+            <option value="dare">Dare</option>
+            <option value="yn">Y/N</option>
+          </select>
+
+          <button onClick={nextTurn} disabled={!selectedLevel || !selectedType} className="w-full max-w-md bg-indigo-600 p-3 rounded-lg font-bold">
             Next {allAnswered || allVoted ? '' : '(Force)'}
           </button>
           <button onClick={handleEndGame} className="w-full max-w-md bg-red-600 p-3 rounded-lg font-bold mt-4">End Game</button>
