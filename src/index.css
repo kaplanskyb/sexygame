@@ -6,9 +6,9 @@
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: dark; /* Forzamos modo oscuro para que combine con el juego */
+  color-scheme: dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #0f172a; /* Slate 900 (el fondo de tu juego) */
+  background-color: #0f172a;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -23,7 +23,6 @@ body {
   min-height: 100vh;
 }
 
-/* Esto asegura que los botones y textos hereden la fuente correctamente */
 button {
   font-family: inherit;
 }
