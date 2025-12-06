@@ -133,6 +133,17 @@ export default function TruthAndDareApp() {
   };
   const startGame = async () => {
     if (players.length < 1) return;
+    // Reset answered for challenges and pairChallenges
+    const challengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
+    const cSnapshot = await getDocs(challengesRef);
+    for (const d of cSnapshot.docs) {
+      await updateDoc(d.ref, { answered: false });
+    }
+    const pairChallengesRef = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
+    const pcSnapshot = await getDocs(pairChallengesRef);
+    for (const d of pcSnapshot.docs) {
+      await updateDoc(d.ref, { answered: false });
+    }
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
       mode: 'admin_setup'
     });
