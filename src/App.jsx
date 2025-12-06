@@ -283,13 +283,39 @@ export default function TruthAndDareApp() {
           const lines = csv.split('\n').slice(1); // skip header
           for (const line of lines) {
             if (!line.trim()) continue;
-            const [level, male, female, type, answered] = line.split(',');
+            let level, male = '', female = '', type_val, answered_val;
+            if (collectionName === 'challenges') {
+              const [levelStr, typeStr, pregunta, sexo, answered] = line.split(',');
+              level = levelStr.trim();
+              const preguntaTrim = pregunta.trim();
+              const sexoTrim = sexo.trim().toUpperCase();
+              if (sexoTrim === 'M') {
+                male = preguntaTrim;
+              } else if (sexoTrim === 'F') {
+                female = preguntaTrim;
+              } else if (sexoTrim === 'B') {
+                male = preguntaTrim;
+                female = preguntaTrim;
+              } else {
+                continue; // skip invalid
+              }
+              const typeTrim = typeStr.trim().toUpperCase();
+              type_val = typeTrim === 'T' ? 'truth' : typeTrim === 'D' ? 'dare' : typeTrim.toLowerCase();
+              answered_val = answered.trim().toLowerCase() === 'true';
+            } else if (collectionName === 'pairChallenges') {
+              const [levelStr, malePregunta, femalePregunta, typeStr, answered] = line.split(',');
+              level = levelStr.trim();
+              male = malePregunta.trim();
+              female = femalePregunta.trim();
+              type_val = typeStr.trim().toLowerCase();
+              answered_val = answered.trim().toLowerCase() === 'true';
+            }
             await addDoc(ref, {
-              level: level.trim(),
-              male: male.trim(),
-              female: female.trim(),
-              type: type.trim().toLowerCase(),
-              answered: answered.trim() === 'T'
+              level,
+              male,
+              female,
+              type: type_val,
+              answered: answered_val
             });
           }
           alert('Upload completed');
