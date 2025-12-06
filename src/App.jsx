@@ -365,11 +365,13 @@ export default function TruthAndDareApp() {
             <option value="male">Male</option>
             <option value="female">Female</option>
           </select>
-          <input 
-            type="number" placeholder="Couple number" 
-            className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
-            value={coupleNumber} onChange={e => setCoupleNumber(e.target.value)}
-          />
+          {userName.toLowerCase() !== 'admin' && (
+            <input 
+              type="number" placeholder="Couple number" 
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
+              value={coupleNumber} onChange={e => setCoupleNumber(e.target.value)}
+            />
+          )}
           {userName.toLowerCase() !== 'admin' && (
             <input 
               type="text" placeholder="Game code" 
