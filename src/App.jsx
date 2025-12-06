@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import {
   Flame, Zap, RefreshCw, Trophy,
-  Upload, X, Check, ThumbsUp, ThumbsDown
+  Upload, X, Check, ThumbsUp, ThumbsDown, ArrowRight
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN FIREBASE ---
@@ -237,7 +237,7 @@ export default function TruthAndDareApp() {
             await addDoc(ref, {
                 level: cols[0].trim(),
                 type: cols[1].trim(),
-                text: cols[2].trim(), // CAMPO TEXT
+                text: cols[2].trim(), // CAMPO TEXT (IMPORTANTE)
                 answered: cols[3]?.trim() === 'T'
             });
         }
@@ -281,9 +281,9 @@ export default function TruthAndDareApp() {
     return challenges.find(c => c.id === gameState?.currentChallengeId);
   };
   
-  // PROTECCIÓN QUE EVITA LA PANTALLA BLANCA
+  // --- ESTA FUNCIÓN ES LA QUE ARREGLA LA PANTALLA BLANCA ---
   const getCardText = (c) => {
-    if (!c) return 'Loading...'; 
+    if (!c) return 'Loading...'; // PROTECCIÓN CRÍTICA
     if (gameState?.mode === 'yn') {
         const myGender = players.find(p => p.uid === user.uid)?.gender || 'male';
         if (isAdmin) return `M: ${c.male} / F: ${c.female}`;
@@ -291,6 +291,7 @@ export default function TruthAndDareApp() {
     }
     return c.text || 'No text found';
   };
+  // ---------------------------------------------------------
 
   const isJoined = players.some(p => p.uid === user?.uid) || isAdmin;
   const isMyTurn = () => gameState && players[gameState?.currentTurnIndex]?.uid === user?.uid;
