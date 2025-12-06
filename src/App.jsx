@@ -281,11 +281,9 @@ export default function TruthAndDareApp() {
     return challenges.find(c => c.id === gameState?.currentChallengeId);
   };
   
-  // --- AQUÍ ESTÁ EL ARREGLO ---
-  // Esta función evita que se rompa el juego si la carta aún no carga
+  // PROTECCIÓN QUE EVITA LA PANTALLA BLANCA
   const getCardText = (c) => {
-    if (!c) return 'Loading...'; // SI NO HAY CARTA, DEVUELVE ESTO EN VEZ DE FALLAR
-    
+    if (!c) return 'Loading...'; 
     if (gameState?.mode === 'yn') {
         const myGender = players.find(p => p.uid === user.uid)?.gender || 'male';
         if (isAdmin) return `M: ${c.male} / F: ${c.female}`;
@@ -293,7 +291,6 @@ export default function TruthAndDareApp() {
     }
     return c.text || 'No text found';
   };
-  // --------------------------------
 
   const isJoined = players.some(p => p.uid === user?.uid) || isAdmin;
   const isMyTurn = () => gameState && players[gameState?.currentTurnIndex]?.uid === user?.uid;
