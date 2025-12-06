@@ -278,22 +278,30 @@ export default function TruthAndDareApp() {
       }
       const reader = new FileReader();
       reader.onload = async (event) => {
-        const csv = event.target.result;
-        const lines = csv.split('\n').slice(1); // skip header
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          const [level, male, female, type, answered] = line.split(',');
-          await addDoc(ref, {
-            level: level.trim(),
-            male: male.trim(),
-            female: female.trim(),
-            type: type.trim().toLowerCase(),
-            answered: answered.trim() === 'T'
-          });
+        try {
+          const csv = event.target.result;
+          const lines = csv.split('\n').slice(1); // skip header
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const [level, male, female, type, answered] = line.split(',');
+            await addDoc(ref, {
+              level: level.trim(),
+              male: male.trim(),
+              female: female.trim(),
+              type: type.trim().toLowerCase(),
+              answered: answered.trim() === 'T'
+            });
+          }
+          alert('Upload completed');
+        } catch (error) {
+          console.error('Error parsing CSV:', error);
+          alert('Error during upload: ' + error.message);
         }
-        alert('Upload completed');
       };
       reader.readAsText(file);
+    } catch (error) {
+      console.error('Error deleting docs:', error);
+      alert('Error during upload: ' + error.message);
     } finally {
       setUploading(false);
     }
