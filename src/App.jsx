@@ -151,7 +151,19 @@ export default function TruthAndDareApp() {
   const startGame = async () => {
     if (players.length < 1) return;
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
-      mode: 'question', currentTurnIndex: 0, questionStreak: 0, answers: {}, votes: {}, adminUid: players[0].uid
+      mode: 'admin_setup'
+    });
+  };
+
+  const startRound = async () => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main'), {
+      mode: selectedType === 'yn' ? 'yn' : selectedType === 'dare' ? 'dare' : 'question',
+      currentTurnIndex: 0,
+      questionStreak: 0,
+      answers: {},
+      votes: {},
+      adminUid: players[0].uid,
+      currentChallengeId: await getNextChallengeId(selectedType === 'yn' ? 'YN' : selectedType.toUpperCase())
     });
   };
 
@@ -184,29 +196,52 @@ export default function TruthAndDareApp() {
       if (nextTurnIndex < players.length) {
         updates = { currentTurnIndex: nextTurnIndex, votes: {}, answers: {} };
       } else {
-        updates = { mode: 'dare', currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
       }
-    } else { // dare
+    } else if (gameState?.mode === 'dare') {
       // Compute points
       const currentUid = players[gameState?.currentTurnIndex]?.uid;
-      const yesVotes = Object.values(gameState?.votes || {}).filter(v => v === 'yes').length;
+      const likeVotes = Object.values(gameState?.votes || {}).filter(v => v === 'like').length;
       const points = gameState?.points || {};
-      points[currentUid] = (points[currentUid] || 0) + yesVotes;
+      points[currentUid] = (points[currentUid] || 0) + likeVotes;
       updates.points = points;
 
       const nextTurnIndex = gameState.currentTurnIndex + 1;
       if (nextTurnIndex < players.length) {
         updates = { currentTurnIndex: nextTurnIndex, votes: {} };
       } else {
-        updates = { mode: 'question', currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
       }
+    } else if (gameState?.mode === 'yn') {
+      // Compute points for pairs
+      const points = gameState?.points || {};
+      Object.keys(gameState?.pairs || {}).forEach(uid1 => {
+        const uid2 = gameState.pairs[uid1];
+        const ans1 = gameState.answers[uid1];
+        const ans2 = gameState.answers[uid2];
+        const type = currentCard()?.type;
+        let match = false;
+        if (type === 'direct') {
+          match = ans1 === ans2;
+        } else if (type === 'inverse') {
+          match = ans1 !== ans2;
+        }
+        if (match) {
+          points[uid1] = (points[uid1] || 0) + 1;
+          points[uid2] = (points[uid2] || 0) + 1;
+        }
+      });
+      updates.points = points;
+      updates = { mode: 'admin_setup', currentTurnIndex: 0, answers: {}, votes: {} };
     }
-    updates.currentChallengeId = await getNextChallengeId(gameState?.mode === 'question' ? 'T' : 'D');
+    updates.currentChallengeId = await getNextChallengeId(selectedType === 'yn' ? 'YN' : selectedType.toUpperCase());
     await updateDoc(gameRef, updates);
   };
 
   const getNextChallengeId = async (type) => {
-    let q = query(collection(db, 'artifacts', appId, 'public', 'data', 'challenges'), where('type', '==', type), where('answered', '==', false), where('level', '==', selectedLevel));
+    let ref = collection(db, 'artifacts', appId, 'public', 'data', 'challenges');
+    if (type === 'YN') ref = collection(db, 'artifacts', appId, 'public', 'data', 'pairChallenges');
+    let q = query(ref, where('answered', '==', false), where('level', '==', selectedLevel));
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
     const challenge = snapshot.docs[Math.floor(Math.random() * snapshot.size)];
@@ -391,6 +426,33 @@ export default function TruthAndDareApp() {
       );
     }
 
+    if (gameState?.mode === 'admin_setup') {
+      return (
+        <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
+          <h2 className="text-2xl font-bold mb-4">Setup Round</h2>
+          <select 
+            value={selectedType} 
+            onChange={e => setSelectedType(e.target.value)} 
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
+          >
+            <option value="">Select Type</option>
+            <option value="truth">Truth</option>
+            <option value="dare">Dare</option>
+            <option value="yn">Y/N</option>
+          </select>
+          <select 
+            value={selectedLevel} 
+            onChange={e => setSelectedLevel(e.target.value)} 
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
+          >
+            <option value="">Select Level</option>
+            {uniqueLevels.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <button onClick={startRound} disabled={!selectedType || !selectedLevel} className="w-full max-w-md bg-green-600 p-4 rounded-xl font-bold">Start Round</button>
+        </div>
+      );
+    }
+
     const card = currentCard();
     const answers = gameState?.answers || {};
     const allAnswered = Object.keys(answers).length >= players.length;
@@ -427,18 +489,7 @@ export default function TruthAndDareApp() {
             {uniqueLevels.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
 
-          <select 
-            value={selectedType} 
-            onChange={e => setSelectedType(e.target.value)} 
-            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-lg py-3 px-4 text-white mb-4"
-          >
-            <option value="">Select Type</option>
-            <option value="truth">Truth</option>
-            <option value="dare">Dare</option>
-            <option value="yn">Y/N</option>
-          </select>
-
-          <button onClick={nextTurn} disabled={!selectedLevel || !selectedType} className="w-full max-w-md bg-indigo-600 p-3 rounded-lg font-bold">
+          <button onClick={nextTurn} disabled={!selectedLevel} className="w-full max-w-md bg-indigo-600 p-3 rounded-lg font-bold">
             Next {allAnswered || allVoted ? '' : '(Force)'}
           </button>
           <button onClick={handleEndGame} className="w-full max-w-md bg-red-600 p-3 rounded-lg font-bold mt-4">End Game</button>
@@ -458,6 +509,14 @@ export default function TruthAndDareApp() {
         </div>
         <p className="text-center text-slate-400">Waiting for admin to start game...</p>
         {isGameAdmin() && <button onClick={startGame} className="w-full max-w-sm bg-green-600 p-4 rounded-xl font-bold">Start Game</button>}
+      </div>
+    );
+  }
+
+  if (gameState?.mode === 'admin_setup') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white p-6 flex flex-col items-center justify-center">
+        <h2 className="text-2xl font-bold mb-4">Waiting for Admin Setup</h2>
       </div>
     );
   }
@@ -505,14 +564,14 @@ export default function TruthAndDareApp() {
             <div className="bg-slate-800 p-4 rounded-xl mb-4">
               <h4 className="font-bold mb-2">Results:</h4>
               {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{gameState?.votes[p.uid]}</span></div>)}
-              {isGameAdmin() && <button onClick={nextTurn} className="w-full mt-4 bg-indigo-600 p-3 rounded-lg font-bold">Next</button>}
+              <p className="text-center text-slate-400">Waiting for admin...</p>
             </div>
           )}
 
-          {gameState?.mode === 'dare' && canVote && (
+          {gameState?.mode === 'dare' && !isMyTurn() && !playerVoted && (
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => submitVote('yes')} className="bg-green-600 p-4 rounded-xl font-bold">Passed</button>
-              <button onClick={() => submitVote('no')} className="bg-red-600 p-4 rounded-xl font-bold">Failed</button>
+              <button onClick={() => submitVote('like')} className="bg-green-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsUp className="mr-2" /> Like</button>
+              <button onClick={() => submitVote('no like')} className="bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsDown className="mr-2" /> No Like</button>
             </div>
           )}
 
@@ -522,15 +581,8 @@ export default function TruthAndDareApp() {
 
           {gameState?.mode === 'dare' && allVoted && (
             <div className="text-center mb-4">
-              {passed ? <Check className="w-12 h-12 text-green-500 mx-auto" /> : <X className="w-12 h-12 text-red-500 mx-auto" />}
-              <p>{passed ? 'Passed' : 'Failed'}</p>
+              <p className="text-center text-slate-400">Waiting for admin...</p>
             </div>
-          )}
-
-          {gameState?.mode === 'dare' && (
-            <button onClick={nextTurn} className="w-full bg-pink-600 p-4 rounded-xl font-bold flex justify-center gap-2" disabled={!isMyTurn() && !isGameAdmin()}>
-              {isMyTurn() || isGameAdmin() ? 'Dare Completed!' : 'Next Turn'} <ArrowRight/>
-            </button>
           )}
         </div>
       </div>
