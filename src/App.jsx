@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { 
   Flame, Zap, RefreshCw, Trophy, 
-  CheckCircle2, ArrowRight, Upload, X, Check
+  CheckCircle2, ArrowRight, Upload, X, Check, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 
 // --- PASTE YOUR CONFIG BELOW ---
@@ -40,6 +40,7 @@ export default function TruthAndDareApp() {
   const [pairChallenges, setPairChallenges] = useState([]);
   const [uniqueLevels, setUniqueLevels] = useState([]);
   const [selectedLevel, setSelectedLevel] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const [loading, setLoading] = useState(true);
   const [inputAnswer, setInputAnswer] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -173,11 +174,17 @@ export default function TruthAndDareApp() {
     const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'gameState', 'main');
     let updates = {};
     if (gameState?.mode === 'question') {
-      const newStreak = gameState.questionStreak + 1;
-      if (newStreak < 3) {
-        updates = { questionStreak: newStreak, answers: {}, votes: {} };
+      const currentUid = players[gameState?.currentTurnIndex]?.uid;
+      const likeVotes = Object.values(gameState?.votes || {}).filter(v => v === 'like').length;
+      const points = gameState?.points || {};
+      points[currentUid] = (points[currentUid] || 0) + likeVotes;
+      updates.points = points;
+
+      const nextTurnIndex = gameState.currentTurnIndex + 1;
+      if (nextTurnIndex < players.length) {
+        updates = { currentTurnIndex: nextTurnIndex, votes: {}, answers: {} };
       } else {
-        updates = { mode: 'dare', questionStreak: 0, currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'dare', currentTurnIndex: 0, answers: {}, votes: {} };
       }
     } else { // dare
       // Compute points
@@ -191,7 +198,7 @@ export default function TruthAndDareApp() {
       if (nextTurnIndex < players.length) {
         updates = { currentTurnIndex: nextTurnIndex, votes: {} };
       } else {
-        updates = { mode: 'question', questionStreak: 0, currentTurnIndex: 0, answers: {}, votes: {} };
+        updates = { mode: 'question', currentTurnIndex: 0, answers: {}, votes: {} };
       }
     }
     updates.currentChallengeId = await getNextChallengeId(gameState?.mode === 'question' ? 'T' : 'D');
@@ -224,24 +231,14 @@ export default function TruthAndDareApp() {
       const lines = csv.split('\n').slice(1); // skip header
       for (const line of lines) {
         if (!line.trim()) continue;
-        if (collectionName === 'pairChallenges') {
-          const [level, male, female, type, answered] = line.split(',');
-          await addDoc(ref, {
-            level: level.trim(),
-            male: male.trim(),
-            female: female.trim(),
-            type: type.trim(),
-            answered: answered.trim() === 'T'
-          });
-        } else {
-          const [level, type, text, answered] = line.split(',');
-          await addDoc(ref, {
-            level: level.trim(),
-            type: type.trim(),
-            text: text.trim(),
-            answered: answered.trim() === 'T'
-          });
-        }
+        const [level, male, female, type, answered] = line.split(',');
+        await addDoc(ref, {
+          level: level.trim(),
+          male: male.trim(),
+          female: female.trim(),
+          type: type.trim(),
+          answered: answered.trim() === 'T'
+        });
       }
       alert('Upload completed');
     };
@@ -478,21 +475,25 @@ export default function TruthAndDareApp() {
         )}
 
         <div className="w-full max-w-md">
-          {gameState?.mode === 'question' && !playerAnswered && (
-            <div className="flex gap-2">
-              <input type="text" value={inputAnswer} onChange={e => setInputAnswer(e.target.value)} className="flex-1 bg-slate-800 border-slate-600 rounded-xl px-4" placeholder="Answer..."/>
-              <button onClick={() => submitAnswer(inputAnswer)} disabled={!inputAnswer} className="bg-purple-600 p-3 rounded-xl"><CheckCircle2/></button>
-            </div>
+          {gameState?.mode === 'question' && isMyTurn() && !playerAnswered && (
+            <button onClick={() => submitAnswer('answered')} className="w-full bg-purple-600 p-4 rounded-xl font-bold">Answered</button>
           )}
           
-          {gameState?.mode === 'question' && playerAnswered && !allAnswered && (
-            <div className="text-center text-slate-400">Waiting for answers...</div>
+          {gameState?.mode === 'question' && playerAnswered && !allVoted && (
+            <div className="text-center text-slate-400">Waiting for votes...</div>
           )}
 
-          {gameState?.mode === 'question' && allAnswered && (
+          {gameState?.mode === 'question' && !isMyTurn() && !playerVoted && (
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={() => submitVote('like')} className="bg-green-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsUp className="mr-2" /> Like</button>
+              <button onClick={() => submitVote('no like')} className="bg-red-600 p-4 rounded-xl font-bold flex items-center justify-center"><ThumbsDown className="mr-2" /> No Like</button>
+            </div>
+          )}
+
+          {gameState?.mode === 'question' && allVoted && (
             <div className="bg-slate-800 p-4 rounded-xl mb-4">
               <h4 className="font-bold mb-2">Results:</h4>
-              {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{gameState?.answers[p.uid]}</span></div>)}
+              {players.map(p => <div key={p.uid} className="flex justify-between py-1 border-b border-slate-700"><span>{p.name} ({p.gender[0].toUpperCase()})</span><span className="font-bold">{gameState?.votes[p.uid]}</span></div>)}
               {isGameAdmin() && <button onClick={nextTurn} className="w-full mt-4 bg-indigo-600 p-3 rounded-lg font-bold">Next</button>}
             </div>
           )}
