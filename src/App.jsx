@@ -298,7 +298,8 @@ export default function TruthAndDareApp() {
               } else {
                 continue; // skip invalid
               }
-              let type_val = typeStr.trim().toUpperCase() === 'T' ? 'truth' : 'dare';
+              const typeTrim = typeStr.trim().toUpperCase();
+              const type_val = typeTrim === 'T' ? 'truth' : typeTrim === 'D' ? 'dare' : typeTrim.toLowerCase();
               const answered_val = answered.trim().toLowerCase() === 'true';
               await addDoc(ref, {
                 level: level.trim(),
