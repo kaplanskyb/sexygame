@@ -223,13 +223,24 @@ export default function TruthAndDareApp() {
       const lines = csv.split('\n').slice(1); // skip header
       for (const line of lines) {
         if (!line.trim()) continue;
-        const [level, type, text, answered] = line.split(',');
-        await addDoc(ref, {
-          level: level.trim(),
-          type: type.trim(),
-          text: text.trim(),
-          answered: answered.trim() === 'T'
-        });
+        if (collectionName === 'pairChallenges') {
+          const [level, male, female, type, answered] = line.split(',');
+          await addDoc(ref, {
+            level: level.trim(),
+            male: male.trim(),
+            female: female.trim(),
+            type: type.trim(),
+            answered: answered.trim() === 'T'
+          });
+        } else {
+          const [level, type, text, answered] = line.split(',');
+          await addDoc(ref, {
+            level: level.trim(),
+            type: type.trim(),
+            text: text.trim(),
+            answered: answered.trim() === 'T'
+          });
+        }
       }
     };
     reader.readAsText(file);
